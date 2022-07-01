@@ -1,5 +1,7 @@
 package io.security.corespringsecurity.security.configs;
 
+import io.security.corespringsecurity.security.common.FormAuthenticationDetailsSource;
+import io.security.corespringsecurity.security.handler.CustomAccessDeniedHandler;
 import io.security.corespringsecurity.security.provider.FormAuthenticationProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,8 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 @Configuration
@@ -25,22 +29,12 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final UserDetailsService userDetailsService;
-    private final AuthenticationDetailsSource formAuthenticationDetailsSource;
+    private final FormAuthenticationDetailsSource formAuthenticationDetailsSource;
     private final AuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    private final AuthenticationFailureHandler custimAUthAuthenticationFailureHandler;
 
 
     //DB 연동
-
-
-    //메모리 방식 인증 설정
-//    @Override
-//    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-//        String password = passwordEncoder().encode("1111");
-//        auth.inMemoryAuthentication().withUser("user").password(password).roles("USER");
-//        auth.inMemoryAuthentication().withUser("manager").password(password).roles("USER", "MANAGER");
-//        auth.inMemoryAuthentication().withUser("admin").password(password).roles("USER", "MANAGER", "ADMIN");
-//    }
-
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {      //우리가 설정한 userDetailsService를 사용해서 인증처리를 하도록 설정
@@ -52,6 +46,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return new FormAuthenticationProvider(userDetailsService, passwordEncoder());
     }
 
+
+
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -62,12 +59,19 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         web.ignoring().requestMatchers(PathRequest.toStaticResources().atCommonLocations());
     }
 
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler(){
+        CustomAccessDeniedHandler customAccessDeniedHandler = new CustomAccessDeniedHandler();
+        customAccessDeniedHandler.setErrorPage("/denied");      //debied 경로 설정
+        return customAccessDeniedHandler;
+    }
+
     @Override
     protected void configure(final HttpSecurity http) throws Exception {
         http
                 .csrf().disable()
                 .authorizeRequests()
-                .antMatchers("/","/users","user/login/**", "/login").permitAll()
+                .antMatchers("/","/users","user/login/**", "/login*").permitAll()
                 .antMatchers("/mypage").hasRole("USER")
                 .antMatchers("/messages").hasRole("MANAGER")
                 .antMatchers("/config").hasRole("ADMIN")
@@ -79,8 +83,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authenticationDetailsSource(formAuthenticationDetailsSource) //request객체 전달 받음
                 .defaultSuccessUrl("/")
                 .successHandler(customAuthenticationSuccessHandler)
+                .failureHandler(custimAUthAuthenticationFailureHandler)
                 .permitAll()
-
+        .and()
+                .exceptionHandling()
+                .accessDeniedHandler(accessDeniedHandler())
     ;
     }
 
